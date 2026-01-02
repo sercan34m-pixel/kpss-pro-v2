@@ -1,0 +1,75 @@
+name: Build Android APK PRO
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Kodları GitHub'dan Çek
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. Java 17 Kur (Android İnşası İçin Şart)
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      # 3. Python Kur
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # 4. GÜVENLİ KLASÖRLEME (Hata Önleyici Kısım)
+      # Dosyaları 'build_area' adında temiz bir odaya taşıyoruz.
+      - name: Setup Project Directory
+        run: |
+          echo "Temiz çalışma alanı oluşturuluyor..."
+          mkdir build_area
+          
+          # Dosyaları taşı
+          find . -maxdepth 1 -name "main.py" -exec mv {} build_area/ \;
+          find . -maxdepth 1 -name "*.json" -exec mv {} build_area/ \;
+          if [ -f "requirements.txt" ]; then mv requirements.txt build_area/; fi
+          if [ -d "assets" ]; then mv assets build_area/; fi
+          
+          echo "Dosyalar taşındı."
+
+      # 5. Gerekli Araçları Yükle
+      - name: Install Build Tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install cookiecutter packaging flet
+
+      # 6. Flutter Kurulumu
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.19.0'
+
+      # 7. Android Lisanslarını Kabul Et
+      - name: Accept Android Licenses
+        run: |
+          yes | flutter doctor --android-licenses
+
+      # 8. APK'yı Derle (Build İşlemi)
+      - name: Build APK
+        run: |
+          cd build_area
+          # verbose komutu ile detaylı log alıyoruz
+          yes | flet build apk --verbose
+
+      # 9. Sonucu Paketle ve İndirilebilir Yap
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: KPSS-PRO-APK
+          path: build_area/build/apk/app-release.apk
